@@ -1,25 +1,50 @@
-#include <wchar.h>
+Encontrei o problema. Seu código tinha um `#endif` faltando logo depois dos includes específicos do Linux. Além disso, identifiquei outro problema importante na implementação Windows: a função `SHGetKnownFolderPath()` estava sendo utilizada incorretamente, podendo corromper o conteúdo da variável `downloads`.
+
+Vou corrigir a estrutura e também melhorar a inicialização da pasta Downloads.
+
+Abaixo está uma versão reestruturada, mantendo as funcionalidades originais e a compatibilidade com Windows e Linux.
+
+## 1\. Novo `main.c` completo
+
+Substitua TODO o conteúdo do seu arquivo `main.c` pelo código abaixo.
+
+c
+
+```c
+
+#define _GNU_SOURCE
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <wchar.h>
 
 #ifdef _WIN32
+
 #define WIN32_LEAN_AND_MEAN
+#define _WIN32_WINNT 0x0600
+
 #include <windows.h>
 #include <shlobj.h>
+#include <objbase.h>
+
 #else
+
 #include <unistd.h>
 #include <limits.h>
 #include <sys/inotify.h>
 #include <sys/stat.h>
 #include <errno.h>
+
 #ifndef PATH_MAX
 #define PATH_MAX 4096
 #endif
 
+#endif
+
 // =====================================
-// CONFIGURAÇÃO
+// CONFIGURACAO
 // =====================================
 
 typedef struct {
@@ -27,7 +52,7 @@ typedef struct {
     const char *pasta;
 } Tipo;
 
-Tipo tipos[] = {
+static const Tipo tipos[] = {
     {".png .jpg .jpeg .gif .webp .bmp", "Imagens"},
     {".pdf .doc .docx .txt .xls .xlsx .ppt .pptx", "Documentos"},
     {".mp4 .mkv .avi .mov .webm", "Videos"},
@@ -40,50 +65,34 @@ Tipo tipos[] = {
 #define TOTAL (sizeof(tipos) / sizeof(tipos[0]))
 
 #ifdef _WIN32
-wchar_t downloads[MAX_PATH];
+static wchar_t downloads[MAX_PATH];
 #else
-char downloads[PATH_MAX];
+static char downloads[PATH_MAX];
 #endif
 
 // =====================================
-// DIRETÓRIO DOWNLOADS
+// IDENTIFICAR EXTENSAO
 // =====================================
 
-int obter_downloads() {
-#ifdef _WIN32
-    return SUCCEEDED(SHGetKnownFolderPath(
-        &FOLDERID_Downloads, 0, NULL,
-        (PWSTR *)&downloads
-    ));
-#else
-    const char *home = getenv("HOME");
+#ifndef _WIN32
 
-    if (!home) return 0;
+static const char *identificar(const char *nome) {
 
-    snprintf(downloads, sizeof(downloads),
-             "%s/Downloads", home);
-
-    return 1;
-#endif
-}
-
-// =====================================
-// IDENTIFICAR EXTENSÃO
-// =====================================
-
-const char *identificar(const char *nome) {
     const char *ext = strrchr(nome, '.');
 
-    if (!ext) return "Outros";
+    if (!ext)
+        return "Outros";
 
     char extensao[32];
 
     snprintf(extensao, sizeof(extensao), "%s", ext);
 
-    for (int i = 0; extensao[i]; i++)
-        extensao[i] = tolower((unsigned char)extensao[i]);
+    for (size_t i = 0; extensao[i]; i++) {
+        extensao[i] = (char)tolower((unsigned char)extensao[i]);
+    }
 
     for (size_t i = 0; i < TOTAL; i++) {
+
         char lista[256];
 
         snprintf(lista, sizeof(lista), "%s",
@@ -92,6 +101,7 @@ const char *identificar(const char *nome) {
         char *item = strtok(lista, " ");
 
         while (item) {
+
             if (strcmp(item, extensao) == 0)
                 return tipos[i].pasta;
 
@@ -102,41 +112,119 @@ const char *identificar(const char *nome) {
     return "Outros";
 }
 
+#endif
+
 // =====================================
-// MOVER ARQUIVO
+// DIRETORIO DOWNLOADS
+// =====================================
+
+static int obter_downloads(void) {
+
+#ifdef _WIN32
+
+    PWSTR caminho = NULL;
+
+    HRESULT resultado = SHGetKnownFolderPath(
+        &FOLDERID_Downloads,
+        0,
+        NULL,
+        &caminho
+    );
+
+    if (FAILED(resultado) || caminho == NULL)
+        return 0;
+
+    size_t tamanho = wcslen(caminho);
+
+    if (tamanho >= MAX_PATH) {
+        CoTaskMemFree(caminho);
+        return 0;
+    }
+
+    wcscpy(downloads, caminho);
+
+    CoTaskMemFree(caminho);
+
+    return 1;
+
+#else
+
+    const char *home = getenv("HOME");
+
+    if (!home)
+        return 0;
+
+    int tamanho = snprintf(
+        downloads,
+        sizeof(downloads),
+        "%s/Downloads",
+        home
+    );
+
+    if (tamanho < 0 || (size_t)tamanho >= sizeof(downloads))
+        return 0;
+
+    return 1;
+
+#endif
+}
+
+// =====================================
+// MOVER ARQUIVO - WINDOWS
 // =====================================
 
 #ifdef _WIN32
 
-void mover(const wchar_t *nome) {
+static void mover(const wchar_t *nome) {
+
     wchar_t origem[MAX_PATH];
     wchar_t pasta[MAX_PATH];
     wchar_t destino[MAX_PATH];
 
-    swprintf(origem, MAX_PATH, L"%ls\\%ls",
-             downloads, nome);
+    if (swprintf(
+        origem,
+        MAX_PATH,
+        L"%ls\\%ls",
+        downloads,
+        nome
+    ) < 0)
+        return;
 
     DWORD atributos = GetFileAttributesW(origem);
 
-    if (atributos == INVALID_FILE_ATTRIBUTES ||
-        (atributos & FILE_ATTRIBUTE_DIRECTORY))
+    if (atributos == INVALID_FILE_ATTRIBUTES)
+        return;
+
+    if (atributos & FILE_ATTRIBUTE_DIRECTORY)
         return;
 
     wchar_t *ext = wcsrchr(nome, L'.');
-    if (!ext) return;
+
+    if (!ext)
+        return;
 
     char extensao[32] = {0};
 
-    WideCharToMultiByte(CP_UTF8, 0, ext, -1,
-                        extensao, sizeof(extensao),
-                        NULL, NULL);
+    if (!WideCharToMultiByte(
+        CP_UTF8,
+        0,
+        ext,
+        -1,
+        extensao,
+        sizeof(extensao),
+        NULL,
+        NULL
+    ))
+        return;
 
-    for (int i = 0; extensao[i]; i++)
-        extensao[i] = tolower((unsigned char)extensao[i]);
+    for (size_t i = 0; extensao[i]; i++) {
+        extensao[i] = (char)tolower((unsigned char)extensao[i]);
+    }
 
     const char *categoria = "Outros";
 
     for (size_t i = 0; i < TOTAL; i++) {
+
         char lista[256];
 
         snprintf(lista, sizeof(lista), "%s",
@@ -145,132 +233,213 @@ void mover(const wchar_t *nome) {
         char *item = strtok(lista, " ");
 
         while (item) {
-            if (!strcmp(item, extensao))
+
+            if (strcmp(item, extensao) == 0) {
                 categoria = tipos[i].pasta;
+                break;
+            }
 
             item = strtok(NULL, " ");
         }
 
-        if (strcmp(categoria, "Outros"))
+        if (strcmp(categoria, "Outros") != 0)
             break;
     }
 
     wchar_t categoria_w[64];
 
-    MultiByteToWideChar(CP_UTF8, 0, categoria, -1,
-                        categoria_w, 64);
+    if (!MultiByteToWideChar(
+        CP_UTF8,
+        0,
+        categoria,
+        -1,
+        categoria_w,
+        64
+    ))
+        return;
 
-    swprintf(pasta, MAX_PATH, L"%ls\\%ls",
-             downloads, categoria_w);
+    if (swprintf(
+        pasta,
+        MAX_PATH,
+        L"%ls\\%ls",
+        downloads,
+        categoria_w
+    ) < 0)
+        return;
 
     CreateDirectoryW(pasta, NULL);
 
-    swprintf(destino, MAX_PATH, L"%ls\\%ls",
-             pasta, nome);
+    if (swprintf(
+        destino,
+        MAX_PATH,
+        L"%ls\\%ls",
+        pasta,
+        nome
+    ) < 0)
+        return;
 
-    // Nunca sobrescrever arquivos.
+    // Nunca sobrescrever arquivos existentes.
+
     if (GetFileAttributesW(destino) != INVALID_FILE_ATTRIBUTES)
         return;
 
-    if (MoveFileW(origem, destino))
+    if (MoveFileW(origem, destino)) {
         wprintf(L"Organizado: %ls\n", nome);
+    }
 }
+
+// =====================================
+// MOVER ARQUIVO - LINUX
+// =====================================
 
 #else
 
-void mover(const char *nome) {
+static void mover(const char *nome) {
+
     char origem[PATH_MAX];
     char pasta[PATH_MAX];
     char destino[PATH_MAX];
 
-    snprintf(origem, sizeof(origem), "%s/%s",
-             downloads, nome);
+    int tamanho = snprintf(
+        origem,
+        sizeof(origem),
+        "%s/%s",
+        downloads,
+        nome
+    );
+
+    if (tamanho < 0 || (size_t)tamanho >= sizeof(origem))
+        return;
 
     struct stat st;
 
-    if (stat(origem, &st) != 0 || !S_ISREG(st.st_mode))
+    if (stat(origem, &st) != 0)
+        return;
+
+    if (!S_ISREG(st.st_mode))
         return;
 
     const char *categoria = identificar(nome);
 
-    snprintf(pasta, sizeof(pasta), "%s/%s",
-             downloads, categoria);
+    tamanho = snprintf(
+        pasta,
+        sizeof(pasta),
+        "%s/%s",
+        downloads,
+        categoria
+    );
+
+    if (tamanho < 0 || (size_t)tamanho >= sizeof(pasta))
+        return;
 
     if (mkdir(pasta, 0755) != 0 && errno != EEXIST)
         return;
 
-    snprintf(destino, sizeof(destino), "%s/%s",
-             pasta, nome);
+    tamanho = snprintf(
+        destino,
+        sizeof(destino),
+        "%s/%s",
+        pasta,
+        nome
+    );
 
-    // rename não deve sobrescrever arquivos.
-    // link + unlink evita sobrescrita no mesmo filesystem.
+    if (tamanho < 0 || (size_t)tamanho >= sizeof(destino))
+        return;
+
+    // link cria o destino sem sobrescrever arquivos.
+    // unlink remove a origem somente após o sucesso.
+
     if (link(origem, destino) == 0) {
-        if (unlink(origem) == 0)
+
+        if (unlink(origem) == 0) {
             printf("Organizado: %s\n", nome);
-        else
+        } else {
             unlink(destino);
+        }
     }
 }
 
 #endif
 
 // =====================================
-// MONITORAMENTO
+// MONITORAMENTO - WINDOWS
 // =====================================
 
 #ifdef _WIN32
 
-void monitorar() {
+static void monitorar(void) {
+
     HANDLE dir = CreateFileW(
         downloads,
         FILE_LIST_DIRECTORY,
         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-        NULL, OPEN_EXISTING,
+        NULL,
+        OPEN_EXISTING,
         FILE_FLAG_BACKUP_SEMANTICS,
         NULL
     );
 
-    if (dir == INVALID_HANDLE_VALUE) return;
+    if (dir == INVALID_HANDLE_VALUE) {
+        printf("Erro ao abrir pasta Downloads.\n");
+        return;
+    }
 
-    char buffer[4096];
+    // Buffer alinhado para FILE_NOTIFY_INFORMATION.
+    DWORD buffer[1024];
 
     printf("Monitorando Downloads...\n");
 
     while (1) {
-        DWORD bytes;
 
-        if (!ReadDirectoryChangesW(
-            dir, buffer, sizeof(buffer), FALSE,
+        DWORD bytes = 0;
+
+        BOOL resultado = ReadDirectoryChangesW(
+            dir,
+            buffer,
+            sizeof(buffer),
+            FALSE,
             FILE_NOTIFY_CHANGE_FILE_NAME,
-            &bytes, NULL, NULL
-        )) continue;
+            &bytes,
+            NULL,
+            NULL
+        );
+
+        if (!resultado || bytes == 0)
+            continue;
 
         FILE_NOTIFY_INFORMATION *evento =
             (FILE_NOTIFY_INFORMATION *)buffer;
 
         do {
+
             if (evento->Action == FILE_ACTION_ADDED ||
                 evento->Action == FILE_ACTION_RENAMED_NEW_NAME) {
 
-                int n = evento->FileNameLength / sizeof(wchar_t);
+                int n = (int)(
+                    evento->FileNameLength / sizeof(wchar_t)
+                );
 
-                if (n >= MAX_PATH) break;
+                if (n > 0 && n < MAX_PATH) {
 
-                wchar_t nome[MAX_PATH];
+                    wchar_t nome[MAX_PATH];
 
-                wmemcpy(nome, evento->FileName, n);
-                nome[n] = L'\0';
+                    wmemcpy(nome, evento->FileName, (size_t)n);
 
-                // Aguarda o arquivo terminar de ser gravado.
-                Sleep(1500);
+                    nome[n] = L'\0';
 
-                mover(nome);
+                    // Aguarda a finalizacao do download.
+                    Sleep(1500);
+
+                    mover(nome);
+                }
             }
 
-            if (!evento->NextEntryOffset) break;
+            if (!evento->NextEntryOffset)
+                break;
 
-            evento = (FILE_NOTIFY_INFORMATION *)
-                ((char *)evento + evento->NextEntryOffset);
+            evento = (FILE_NOTIFY_INFORMATION *)(
+                (char *)evento + evento->NextEntryOffset
+            );
 
         } while (1);
     }
@@ -278,15 +447,29 @@ void monitorar() {
     CloseHandle(dir);
 }
 
+// =====================================
+// MONITORAMENTO - LINUX
+// =====================================
+
 #else
 
-void monitorar() {
+static void monitorar(void) {
+
     int fd = inotify_init1(IN_CLOEXEC);
 
-    if (fd < 0) return;
+    if (fd < 0) {
+        perror("Erro ao iniciar inotify");
+        return;
+    }
 
-    if (inotify_add_watch(fd, downloads,
-        IN_CLOSE_WRITE | IN_MOVED_TO) < 0) {
+    int watch = inotify_add_watch(
+        fd,
+        downloads,
+        IN_CLOSE_WRITE | IN_MOVED_TO
+    );
+
+    if (watch < 0) {
+        perror("Erro ao monitorar Downloads");
         close(fd);
         return;
     }
@@ -296,27 +479,50 @@ void monitorar() {
     printf("Monitorando Downloads...\n");
 
     while (1) {
-        int tamanho = read(fd, buffer, sizeof(buffer));
+
+        ssize_t tamanho = read(
+            fd,
+            buffer,
+            sizeof(buffer)
+        );
 
         if (tamanho < 0) {
-            if (errno == EINTR) continue;
+
+            if (errno == EINTR)
+                continue;
+
+            perror("Erro durante monitoramento");
             break;
         }
 
-        int pos = 0;
+        if (tamanho == 0)
+            continue;
 
-        while (pos < tamanho) {
+        ssize_t pos = 0;
+
+        while (pos + (ssize_t)sizeof(struct inotify_event) <= tamanho) {
+
             struct inotify_event *evento =
                 (struct inotify_event *)(buffer + pos);
 
+            size_t tamanho_evento =
+                sizeof(struct inotify_event) + evento->len;
+
+            if (pos + (ssize_t)tamanho_evento > tamanho)
+                break;
+
             if (!(evento->mask & IN_ISDIR) &&
-                evento->len > 0) {
+                evento->len > 0 &&
+                evento->name[0] != '\0') {
+
                 mover(evento->name);
             }
 
-            pos += sizeof(struct inotify_event) + evento->len;
+            pos += (ssize_t)tamanho_evento;
         }
     }
+
+    inotify_rm_watch(fd, watch);
 
     close(fd);
 }
@@ -327,15 +533,21 @@ void monitorar() {
 // MAIN
 // =====================================
 
-int main() {
+int main(void) {
+
     if (!obter_downloads()) {
+
         printf("Erro ao localizar Downloads.\n");
+
         return 1;
     }
 
     printf("Organizador de Downloads iniciado.\n");
 
+    printf("Pressione Ctrl+C para encerrar.\n");
+
     monitorar();
 
     return 0;
 }
+```
