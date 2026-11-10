@@ -1,0 +1,267 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Organizador de Downloads | C</title>
+
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    background: #090d18;
+    color: #fff;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 25px;
+}
+
+.container {
+    width: 100%;
+    max-width: 750px;
+    background: #111827;
+    border: 1px solid #26334a;
+    border-radius: 20px;
+    padding: 45px;
+    text-align: center;
+    box-shadow: 0 20px 70px #0008;
+}
+
+.icon {
+    font-size: 65px;
+    margin-bottom: 20px;
+}
+
+h1 {
+    font-size: 30px;
+    margin-bottom: 15px;
+}
+
+h1 span {
+    color: #38bdf8;
+}
+
+.description {
+    color: #9ca3af;
+    line-height: 1.7;
+    margin-bottom: 30px;
+}
+
+.features {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 30px;
+    text-align: left;
+}
+
+.feature {
+    background: #1b2639;
+    padding: 17px;
+    border-radius: 10px;
+    color: #d1d5db;
+    font-size: 14px;
+}
+
+.feature strong {
+    display: block;
+    color: #38bdf8;
+    margin-bottom: 6px;
+}
+
+button {
+    width: 100%;
+    padding: 17px;
+    background: #0284c7;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: .2s;
+}
+
+button:hover {
+    background: #0369a1;
+    transform: translateY(-2px);
+}
+
+.secondary {
+    margin-top: 12px;
+    background: #26334a;
+}
+
+.secondary:hover {
+    background: #37465f;
+}
+
+.status {
+    margin-top: 20px;
+    color: #4ade80;
+    font-size: 14px;
+}
+
+footer {
+    margin-top: 30px;
+    color: #64748b;
+    font-size: 12px;
+}
+
+@media(max-width: 550px) {
+    .container {
+        padding: 25px;
+    }
+
+    .features {
+        grid-template-columns: 1fr;
+    }
+
+    h1 {
+        font-size: 24px;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <div class="icon">📂</div>
+
+    <h1>Organizador de <span>Downloads</span></h1>
+
+    <p class="description">
+        Organize automaticamente seus arquivos baixados.
+        O programa monitora sua pasta Downloads e separa
+        os arquivos em categorias conforme suas extensões.
+    </p>
+
+    <div class="features">
+
+        <div class="feature">
+            <strong>🖼️ Imagens</strong>
+            PNG, JPG, GIF, WEBP e BMP.
+        </div>
+
+        <div class="feature">
+            <strong>📄 Documentos</strong>
+            PDF, DOCX, TXT, XLSX e outros.
+        </div>
+
+        <div class="feature">
+            <strong>🎬 Vídeos</strong>
+            MP4, MKV, AVI e MOV.
+        </div>
+
+        <div class="feature">
+            <strong>🎵 Músicas</strong>
+            MP3, WAV, FLAC e OGG.
+        </div>
+
+        <div class="feature">
+            <strong>📦 Compactados</strong>
+            ZIP, RAR, 7Z, TAR e GZ.
+        </div>
+
+        <div class="feature">
+            <strong>💻 Programas e códigos</strong>
+            EXE, MSI, C, CPP, PY, JS e outros.
+        </div>
+
+    </div>
+
+    <button onclick="baixar()">
+        ⬇ Baixar código-fonte (.C)
+    </button>
+
+    <button class="secondary" onclick="copiar()">
+        📋 Copiar código-fonte
+    </button>
+
+    <p class="status" id="status"></p>
+
+    <footer>
+        Organizador de Downloads • Desenvolvido em C
+        <br>
+        Windows e Linux
+    </footer>
+
+</div>
+
+<!--
+    COLE O SEU CÓDIGO COMPLETO AQUI,
+    ENTRE AS TAGS TEXTAREA.
+-->
+
+<textarea id="codigo" style="display:none;">
+COLE_AQUI_SEU_CODIGO_C_COMPLETO
+</textarea>
+
+<script>
+
+function baixar() {
+
+    const codigo = document.getElementById("codigo").value;
+
+    if (codigo.trim() === "COLE_AQUI_SEU_CODIGO_C_COMPLETO") {
+        alert("Adicione o código C na página antes de baixar.");
+        return;
+    }
+
+    const blob = new Blob(
+        [codigo],
+        { type: "text/x-csrc;charset=utf-8" }
+    );
+
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = "organizador.c";
+
+    document.body.appendChild(link);
+    link.click();
+
+    document.body.removeChild(link);
+
+    URL.revokeObjectURL(url);
+
+    document.getElementById("status").textContent =
+        "✓ Download iniciado com sucesso!";
+}
+
+async function copiar() {
+
+    const codigo = document.getElementById("codigo").value;
+
+    if (codigo.trim() === "COLE_AQUI_SEU_CODIGO_C_COMPLETO") {
+        alert("Adicione o código C na página antes de copiar.");
+        return;
+    }
+
+    try {
+        await navigator.clipboard.writeText(codigo);
+
+        document.getElementById("status").textContent =
+            "✓ Código copiado para a área de transferência!";
+
+    } catch (erro) {
+        alert("Não foi possível copiar. Abra a página em um contexto seguro.");
+    }
+}
+
+</script>
+
+</body>
+</html>
