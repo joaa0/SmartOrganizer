@@ -1,4 +1,4 @@
-
+#include <wchar.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -81,7 +81,7 @@ const char *identificar(const char *nome) {
     for (int i = 0; extensao[i]; i++)
         extensao[i] = tolower((unsigned char)extensao[i]);
 
-    for (int i = 0; i < TOTAL; i++) {
+    for (size_t i = 0; i < TOTAL; i++) {
         char lista[256];
 
         snprintf(lista, sizeof(lista), "%s",
@@ -134,7 +134,7 @@ void mover(const wchar_t *nome) {
 
     const char *categoria = "Outros";
 
-    for (int i = 0; i < TOTAL; i++) {
+    for (size_t i = 0; i < TOTAL; i++) {
         char lista[256];
 
         snprintf(lista, sizeof(lista), "%s",
