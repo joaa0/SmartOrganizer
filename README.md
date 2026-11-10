@@ -72,7 +72,7 @@ cd organizador-downloads
 Utilizando MinGW:
 
 ```bash
-gcc organizador.c -o organizador.exe -lshell32
+gcc main.c -o organizador.exe -lshell32
 ```
 
 ### Linux
@@ -80,7 +80,7 @@ gcc organizador.c -o organizador.exe -lshell32
 Utilizando GCC:
 
 ```bash
-gcc organizador.c -o organizador
+gcc main.c -o organizador
 ```
 
 ## ▶️ Execução
