@@ -20,7 +20,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y gcc
 
       - name: Compile
-        run: gcc -Wall -Wextra -std=c11 organizador.c -o organizador
+        run: gcc -Wall -Wextra -std=c11 main.c -o organizador
 
   build-windows:
     name: Build Windows
@@ -32,4 +32,4 @@ jobs:
 
       - name: Compile
         shell: bash
-        run: gcc -Wall -Wextra -std=c11 organizador.c -o organizador.exe -lshell32
+        run: gcc -Wall -Wextra -std=c11 main.c -o organizador.exe -lshell32
