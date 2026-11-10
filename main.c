@@ -1,16 +1,3 @@
-Encontrei o problema. Seu código tinha um `#endif` faltando logo depois dos includes específicos do Linux. Além disso, identifiquei outro problema importante na implementação Windows: a função `SHGetKnownFolderPath()` estava sendo utilizada incorretamente, podendo corromper o conteúdo da variável `downloads`.
-
-Vou corrigir a estrutura e também melhorar a inicialização da pasta Downloads.
-
-Abaixo está uma versão reestruturada, mantendo as funcionalidades originais e a compatibilidade com Windows e Linux.
-
-## 1\. Novo `main.c` completo
-
-Substitua TODO o conteúdo do seu arquivo `main.c` pelo código abaixo.
-
-c
-
-```c
 
 #define _GNU_SOURCE
 
@@ -550,4 +537,3 @@ int main(void) {
 
     return 0;
 }
-```
