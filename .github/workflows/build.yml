@@ -3,11 +3,9 @@ name: C Cross-Platform Build
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -15,41 +13,36 @@ permissions:
 
 jobs:
   linux:
-    name: Linux - GCC
+    name: Build Linux
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Install GCC
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc
 
       - name: Compile
         run: |
-          gcc -Wall -Wextra -std=c11 -O2 main.c -o organizador
+          gcc -Wall -Wextra -Wpedantic -std=c11 -O2 main.c -o organizador
 
-      - name: Verify executable
+      - name: Verify
         run: |
           test -x organizador
           file organizador
 
   windows:
-    name: Windows - GCC
+    name: Build Windows
     runs-on: windows-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Compile
         shell: bash
         run: |
-          gcc -Wall -Wextra -std=c11 -O2 main.c -o organizador.exe -lshell32
+          gcc -Wall -Wextra -Wpedantic -std=c11 -O2 main.c -o organizador.exe -lshell32 -lole32 -luuid
 
-      - name: Verify executable
+      - name: Verify
         shell: bash
         run: |
           test -f organizador.exe
